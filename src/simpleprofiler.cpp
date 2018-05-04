@@ -40,6 +40,7 @@ QList<uintptr_t> Backtrace() {
         }
 
         // consume very much CPU compared to things belong to the tracee.
+        /*
         if (Collector::instance()->getSymName(pc).isEmpty()) {
             char sym[256];
             if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0) {
@@ -56,6 +57,7 @@ QList<uintptr_t> Backtrace() {
                 std::free(demangled);
             }
         }
+        */
 
         ret << (uintptr_t)pc;
     }

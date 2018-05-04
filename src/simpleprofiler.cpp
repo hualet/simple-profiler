@@ -13,7 +13,6 @@
 #include <libunwind.h>
 
 #include <QDebug>
-#include <QTime>
 
 #include "collector.h"
 
@@ -68,16 +67,9 @@ void SigProfHandler(int, siginfo_t*, void*)
 {
     _instace.disableProfile();
 
-    QTime t;
-    t.start();
     QList<uintptr_t> backtrace = Backtrace();
-    qDebug() << t.elapsed() << "-----------";
-    t.restart();
     pid_t threadID = syscall(SYS_gettid);
-    qDebug() << t.elapsed();
-    t.restart();
     Collector::instance()->collectSample(threadID, backtrace);
-    qDebug() << t.elapsed();
 
     _instace.enableProfile();
 }

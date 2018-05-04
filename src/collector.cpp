@@ -37,6 +37,8 @@ void Collector::setSymName(uintptr_t ptr, QString name)
 
 void Collector::collectSample(pid_t threadID, QList<uintptr_t> stacktrace)
 {
+    qDebug() << "collecting...";
+
     QList<QList<uintptr_t>> samples = m_samples.value(threadID);
     samples.append(stacktrace);
     m_samples[threadID] = samples;

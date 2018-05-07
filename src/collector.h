@@ -1,7 +1,8 @@
 #ifndef COLLECTOR_H
 #define COLLECTOR_H
 
-#include <QMap>
+#include <sys/types.h>
+#include <stdint.h>
 
 class Collector
 {
@@ -10,21 +11,35 @@ public:
 
     static Collector* instance();
 
-    QString getSymName(uintptr_t ptr) const;
-    void setSymName(uintptr_t ptr, QString name);
-
-    void collectSample(pid_t threadID, QList<uintptr_t> stacktrace);
+    void collectSample(pid_t threadID, uint8_t depth, uintptr_t *stacktrace);
 
 private:
-    QMap<uintptr_t, QString> m_symNameMap;
+    static const int kStacktraceNum = 128;
+    static const int kSampleNum = 1024;
+    static const int kThreadNum = 128;
 
-    QMap<pid_t, QList<QList<uintptr_t>>> m_samples;
+    struct Sample {
+        int depth;
+        uintptr_t stacktrace[kStacktraceNum];
+    };
+
+    struct ThreadBucket {
+        pid_t tid;
+
+        int sampleCount;
+        Sample samples[kSampleNum];
+    };
+    
+    int m_threadCount;
+    ThreadBucket m_threads[kThreadNum];
 
     Collector();
 
-    uint8_t compareShared(const QList<uintptr_t> &lastStack, const QList<uintptr_t> &stack) const;
+//    uint8_t compareShared(const QList<uintptr_t> &lastStack, const QList<uintptr_t> &stack) const;
 
     void dumpOne() const;
+
+    int findThreadIndex(const pid_t& threadID) const;
 };
 
 #endif // COLLECTOR_H

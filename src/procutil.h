@@ -1,12 +1,10 @@
 #ifndef PROCUTIL_H
 #define PROCUTIL_H
 
-#include <QString>
-
 class ProcUtil
 {
 public:
-    static QString getApplicationPath();
+    static char* getApplicationPath();
 };
 
 #endif // PROCUTIL_H

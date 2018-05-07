@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <string.h>
 #include <signal.h>
+#include <stdio.h>
 
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -12,15 +13,11 @@
 #include <cxxabi.h>
 #include <libunwind.h>
 
-#include <QDebug>
-
 #include "collector.h"
 
 SimpleProfiler _instace;
 
-QList<uintptr_t> Backtrace() {
-    QList<uintptr_t> ret;
-
+void Backtrace(uint8_t *depth, uintptr_t *stacktrace) {
     unw_cursor_t cursor;
     unw_context_t context;
 
@@ -31,18 +28,21 @@ QList<uintptr_t> Backtrace() {
     unw_step(&cursor); // SigProfHandler
     unw_step(&cursor); // __rt_restore
 
+    int i = 0;
     // Unwind frames one by one, going up the frame stack.
     while (unw_step(&cursor) > 0) {
-        unw_word_t offset, pc;
+        unw_word_t pc;
         unw_get_reg(&cursor, UNW_REG_IP, &pc);
         if (pc == 0) {
             break;
         }
 
         // consume very much CPU compared to things belong to the tracee.
+        // AND will cause deadlock since bellow lines allocate memory.
         /*
         if (Collector::instance()->getSymName(pc).isEmpty()) {
             char sym[256];
+            unw_word_t offset;
             if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0) {
                 char* nameptr = sym;
 
@@ -59,19 +59,21 @@ QList<uintptr_t> Backtrace() {
         }
         */
 
-        ret << (uintptr_t)pc;
+        stacktrace[i++] = pc;
     }
-
-    return ret;
+    *depth = i;
 }
 
 void SigProfHandler(int, siginfo_t*, void*)
 {
     _instace.disableProfile();
 
-    QList<uintptr_t> backtrace = Backtrace();
+    uint8_t depth;
+    uintptr_t stacktrace[128];
+    Backtrace(&depth, stacktrace);
+
     pid_t threadID = syscall(SYS_gettid);
-    Collector::instance()->collectSample(threadID, backtrace);
+    Collector::instance()->collectSample(threadID, depth, stacktrace);
 
     _instace.enableProfile();
 }
@@ -109,7 +111,7 @@ void SimpleProfiler::enableProfile()
 {
     int ret = setitimer(ITIMER_PROF, &m_tick, nullptr);
     if ( ret != 0) {
-        qDebug() << "failed to enable profiler: " << strerror(errno);
+        fprintf(stderr, "failed to enable profiler: %s", strerror(errno));
     }
 }
 
@@ -117,6 +119,6 @@ void SimpleProfiler::disableProfile()
 {
     int ret = setitimer(ITIMER_PROF, nullptr, &m_tick);
     if ( ret != 0) {
-        qDebug() << "failed to enable profiler: " << strerror(errno);
+        fprintf(stderr, "failed to disable profiler: %s", strerror(errno));
     }
 }

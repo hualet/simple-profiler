@@ -1,7 +1,7 @@
 #include "collector.h"
 
-#include <QDebug>
-#include <QProcess>
+#include <stdio.h>
+#include <memory.h>
 
 #include "procutil.h"
 
@@ -25,83 +25,61 @@ Collector::Collector()
 
 }
 
-QString Collector::getSymName(uintptr_t ptr) const
+void Collector::collectSample(pid_t threadID, uint8_t depth, uintptr_t* stacktrace)
 {
-    return m_symNameMap.value(ptr, "");
-}
+    ThreadBucket *thread = nullptr;
 
-void Collector::setSymName(uintptr_t ptr, QString name)
-{
-    m_symNameMap[ptr] = name;
-}
-
-void Collector::collectSample(pid_t threadID, QList<uintptr_t> stacktrace)
-{
-    qDebug() << "collecting...";
-
-    QList<QList<uintptr_t>> samples = m_samples.value(threadID);
-    samples.append(stacktrace);
-    m_samples[threadID] = samples;
-}
-
-uint8_t Collector::compareShared(const QList<uintptr_t> &lastStack, const QList<uintptr_t> &stack) const
-{
-    if (lastStack.length() == 0 || stack.length() == 0) {
-        return 0;
+    int idx = findThreadIndex(threadID);
+    if (idx < 0) {
+        thread = &m_threads[m_threadCount];
+        m_threadCount++;
+    } else {
+        thread = &m_threads[idx];
     }
 
-    int i = 1;
-    for (; i < stack.length() && i < stack.length(); i++) {
-        if (lastStack.at(lastStack.length() - i) != stack.at(stack.length() - i))
-            break;
-    }
+    Sample *sample = &thread->samples[thread->sampleCount];
 
-//    QDebug deg = qDebug();
-//    for (const uintptr_t ptr : lastStack) {
-//        deg << m_symNameMap.value(ptr);
-//    }
-
-//    QDebug deg1 = qDebug();
-//    for (const uintptr_t ptr : stack) {
-//        deg1 << m_symNameMap.value(ptr);
-//    }
-
-//    qDebug() << lastStack << lastStack.length();
-//    qDebug() << stack << lastStack.length();
-//    qDebug() << i - 1;
-
-    return i - 1;
+    thread->tid = threadID;
+    sample->depth = depth;
+    memcpy(sample->stacktrace, stacktrace, sizeof(uintptr_t)*depth);
+    thread->sampleCount++;
 }
+
+//uint8_t Collector::compareShared(const QList<uintptr_t> &lastStack, const QList<uintptr_t> &stack) const
+//{
+//    if (lastStack.length() == 0 || stack.length() == 0) {
+//        return 0;
+//    }
+
+//    int i = 1;
+//    for (; i < stack.length() && i < stack.length(); i++) {
+//        if (lastStack.at(lastStack.length() - i) != stack.at(stack.length() - i))
+//            break;
+//    }
+
+//    return i - 1;
+//}
 
 void Collector::dumpOne() const
 {
-    qDebug() << "";
-    qDebug() << "";
-    qDebug() << "=====================";
-
-    for (const pid_t threadID : m_samples.keys()) {
-        qDebug() << "thread: " << threadID;
-        qDebug() << "=====================";
-
-        QList<QList<uintptr_t>> samples = m_samples.value(threadID);
-
-        QMap<uintptr_t, uint64_t> counts;
-        QList<uintptr_t> lastStack = QList<uintptr_t>();
-        for (const QList<uintptr_t>& stack : samples) {
-            const int n = compareShared(lastStack, stack);
-            if (n < stack.length()) {
-                for (int i = 0; i < (stack.length() - n); i++) {
-                    uintptr_t ptr = stack.at(i);
-                    counts[ptr] = counts.value(ptr) + 1;
-                }
-            }
-            lastStack = stack;
+    for (int i = 0; i < m_threadCount; i++) {
+        const ThreadBucket *buk = &m_threads[i];
+        printf("Thread: %d\n=======================\n", buk->tid);
+        const Sample *samp = &buk->samples[buk->sampleCount - 1];
+        for (int z = 0; z < samp->depth; z++) {
+            printf("0x%lx \n", samp->stacktrace[z]);
         }
-
-        for (const uintptr_t ptr : lastStack) {
-            qDebug() << QString::number(ptr, 16) << " (" <<  m_symNameMap.value(ptr) << ") " << counts.value(ptr);
-        }
-
-        qDebug() << "";
+        printf("\n");
     }
+}
+
+int Collector::findThreadIndex(const pid_t &threadID) const
+{
+    for (int i = 0; i < m_threadCount; i++) {
+        const ThreadBucket *buk = &m_threads[i];
+        if (buk->tid == threadID)
+            return i;
+    }
+
+    return -1;
 }

@@ -1,0 +1,24 @@
+QXcbEventReader;[libc-2.24.so];[unknown] 1
+QXcbEventReader;[libc-2.24.so];entry_SYSCALL_64_after_hwframe;do_syscall_64;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range_clock;schedule;__schedule;finish_task_switch;__perf_event_task_sched_in;__intel_pmu_enable_all.constprop.18;native_apic_mem_write 1
+QXcbEventReader;[libc-2.24.so];entry_SYSCALL_64_after_hwframe;do_syscall_64;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range_clock;schedule;__schedule;finish_task_switch;__perf_event_task_sched_in;__intel_pmu_enable_all.constprop.18;native_write_msr 9
+QXcbEventReader;[libc-2.24.so];intel_bts_enable_local 2
+QXcbEventReader;[unknown];__libc_recvmsg;entry_SYSCALL_64_after_hwframe;do_syscall_64;__sys_recvmsg;___sys_recvmsg;unix_stream_recvmsg;unix_stream_read_generic;consume_skb;skb_release_all;skb_release_head_state;unix_destruct_scm;sock_wfree;unix_write_space;__wake_up_common_lock;__wake_up_common 1
+QXcbEventReader;[unknown];__libc_recvmsg;entry_SYSCALL_64_after_hwframe;do_syscall_64;__sys_recvmsg;___sys_recvmsg;unix_stream_recvmsg;unix_stream_read_generic;unix_stream_read_actor;skb_copy_datagram_iter;_copy_to_iter;copyout;copy_user_generic_unrolled 1
+perf_4.14;[unknown];entry_SYSCALL_64_after_hwframe;do_syscall_64;sys_execve;do_execveat_common.isra.30;search_binary_handler;load_elf_binary;setup_new_exec;perf_event_exec;__intel_pmu_enable_all.constprop.18;native_write_msr 3
+perf_4.14;[unknown];native_sched_clock 1
+tracee;[i965_dri.so] 1
+tracee;[libc-2.24.so];entry_SYSCALL_64_after_hwframe;do_syscall_64;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range_clock;schedule;__schedule;finish_task_switch;__perf_event_task_sched_in;__intel_pmu_enable_all.constprop.18;native_write_msr 3
+tracee;[libc-2.24.so];intel_pmu_handle_irq 1
+tracee;[unknown];QTimerEvent::~QTimerEvent;[unknown];QApplicationPrivate::notify_helper;QTimer::timerEvent;QMetaObject::activate;QtPrivate::QSlotObject<void ;QtPrivate::FunctionPointer<void ;QtPrivate::FunctorCall<QtPrivate::IndexesList<>, QtPrivate::List<>, void, void ;Widget::consumeCPU 3
+tracee;[unknown];QXcbConnection::qt_metacast;[unknown];pthread_mutex_lock@plt 1
+tracee;[unknown];[libQt5XcbQpa.so.5.6.1];__clone;native_sched_clock 1
+tracee;[unknown];[libQt5XcbQpa.so.5.6.1];__clone;ret_from_fork;schedule_tail;finish_task_switch;__perf_event_task_sched_in;__intel_pmu_enable_all.constprop.18;native_write_msr 2
+tracee;[unknown];[libc-2.24.so];[unknown] 1
+tracee;[unknown];[libxkbcommon-x11.so.0.0.0] 1
+tracee;[unknown];__clone;[unknown] 1
+tracee;[unknown];__libc_recvmsg;entry_SYSCALL_64_after_hwframe;do_syscall_64;__sys_recvmsg;___sys_recvmsg;unix_stream_recvmsg;unix_stream_read_generic;skb_unlink;_raw_spin_lock_irqsave 1
+tracee;[unknown];__perf_addr_filters_adjust 1
+tracee;__mmap64;entry_SYSCALL_64_after_hwframe;do_syscall_64;sys_mmap_pgoff;vm_mmap_pgoff;do_mmap;mmap_region;vma_link;__vma_link_rb;vma_compute_subtree_gap 1
+tracee;do_lookup_x 1
+tracee;pthread_cond_wait@@GLIBC_2.3.2;entry_SYSCALL_64_after_hwframe;do_syscall_64;sys_futex;do_futex;futex_wait;futex_wait_queue_me;schedule;__schedule;finish_task_switch;__perf_event_task_sched_in;__intel_pmu_enable_all.constprop.18;native_write_msr 3
+tracee;pthread_cond_wait@@GLIBC_2.3.2;entry_SYSCALL_64_after_hwframe;do_syscall_64;sys_futex;do_futex;futex_wait;futex_wait_queue_me;schedule;__schedule;finish_task_switch;__perf_event_task_sched_in;__intel_pmu_enable_all.constprop.18;perf_event_nmi_handler 1

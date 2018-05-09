@@ -87,6 +87,7 @@ SimpleProfiler::SimpleProfiler()
 
 SimpleProfiler::~SimpleProfiler()
 {
+    disableProfile();
     delete Collector::instance();
 }
 

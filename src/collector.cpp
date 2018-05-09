@@ -4,6 +4,25 @@
 #include <memory.h>
 
 #include "procutil.h"
+#include "elfutil.h"
+
+int getSymName(uintptr_t pc, char* symName)
+{
+    int offset;
+    char elfname[256];
+
+    int ret = ProcUtil::findTargetElf(pc, elfname, &offset);
+    if (ret != 0) {
+        return ret;
+    }
+
+    ret = ElfUtil::findSymNameElf(elfname, offset, symName);
+    if (ret != 0) {
+        return ret;
+    }
+
+    return 0;
+}
 
 static Collector* _instance = nullptr;
 
@@ -67,7 +86,14 @@ void Collector::dumpOne() const
         printf("Thread: %d\n=======================\n", buk->tid);
         const Sample *samp = &buk->samples[buk->sampleCount - 1];
         for (int z = 0; z < samp->depth; z++) {
-            printf("0x%lx \n", samp->stacktrace[z]);
+            char symName[256];
+            uintptr_t pc = samp->stacktrace[z];
+            int ret = getSymName(pc, symName);
+            if (ret == 0) {
+                printf("%s (0x%lx) \n", symName, pc);
+            } else {
+                printf("(0x%lx) \n", pc);
+            }
         }
         printf("\n");
     }

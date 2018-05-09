@@ -27,13 +27,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         simpleprofiler.cpp \
     collector.cpp \
-    procutil.cpp
+    procutil.cpp \
+    elfutil.cpp
 
 HEADERS += \
         simpleprofiler.h \
         simple-profiler_global.h \ 
     collector.h \
-    procutil.h
+    procutil.h \
+    elfutil.h
 
 unix {
     target.path = /usr/lib

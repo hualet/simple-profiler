@@ -35,7 +35,8 @@ private:
 
     Collector();
 
-//    uint8_t compareShared(const QList<uintptr_t> &lastStack, const QList<uintptr_t> &stack) const;
+    uint8_t compareShared(const uintptr_t* lastStack, int lastStackDepth,
+                          const uintptr_t* stack, int stackDepth) const;
 
     void dumpOne() const;
 

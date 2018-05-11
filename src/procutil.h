@@ -6,7 +6,6 @@
 class ProcUtil
 {
 public:
-    static char* getApplicationPath();
     static int findTargetElf(uintptr_t pc, char* elf, int* offset);
 };
 

@@ -3,11 +3,6 @@
 #include <fstream>
 #include <sstream>
 
-char* ProcUtil::getApplicationPath()
-{
-    return "/home/hualet/temp/build-test-load-unused-Desktop_Qt_5_10_1_GCC_64bit-Debug/test-load-unused";
-}
-
 uintptr_t parseAddress(std::string &str)
 {
     uintptr_t ret;

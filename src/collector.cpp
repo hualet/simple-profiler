@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <cxxabi.h>
+#include <sstream>
 
 #include "procutil.h"
 #include "elfutil.h"
@@ -71,7 +72,9 @@ void Collector::dumpOne()
                 if (ret == 0) {
                     symbolizedStack.push_back(std::string(symname));
                 } else {
-                    symbolizedStack.push_back(std::to_string(pc));
+                    std::stringstream stream;
+                    stream << "0x" << std::hex << pc;
+                    symbolizedStack.push_back(std::string(stream.str()));
                 }
             }
 
@@ -98,11 +101,12 @@ void Collector::dumpOne()
 
         auto printSym = [&execCount](std::string sym) {
             uint16_t execTime = execCount[sym];
-            printf("%.40s x %d\n",sym.c_str(), execTime);
+            printf("%.50s x %d\n",sym.c_str(), execTime);
         };
 
-        printf("========================== Thread: %d =======================\n", buk->tid);
+        printf("========================== Thread: %d =======================\n\n", buk->tid);
         printf("Current stack: \n");
+        printf("--------------------------------\n");
         const Sample *samp = &buk->samples[buk->sampleCount - 1];
         for (int z = 0; z < samp->depth; z++) {
             printPC(samp->stacktrace[z]);
@@ -120,6 +124,7 @@ void Collector::dumpOne()
                   std::pair<std::string, uint16_t>& b) { return a.second > b.second; });
 
         printf("Max executed function(top  10): \n");
+        printf("--------------------------------\n");
         int c = 0;
         for (std::vector<std::pair<std::string, uint16_t>>::iterator iter = pairs.begin();
              iter != pairs.end() && c < 10; ++iter, c++) {

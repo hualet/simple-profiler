@@ -11,17 +11,56 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
-
 #include <iostream>
+#include <vector>
 
-int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName)
+#include <elf/elf++.hh>
+#include <dwarf/dwarf++.hh>
+#include <fcntl.h>
+
+using namespace std;
+
+void getElfBuildID(const char* file, Elf64_Off offset, Elf64_Xword size, char* buildID)
+{
+    const char* data = file + offset;
+
+   int32_t name_size;
+   int32_t desc_size;
+   memcpy(&name_size, data, 4);
+   memcpy(&desc_size, data + 4, 4);
+
+   // http://www.netbsd.org/docs/kernel/elf-notes.html
+   // name_size: 4 bytes
+   // desc_size: 4 bytes
+   // type: 4 bytes
+   // name: name_size
+   // desc: desc_size
+   if (4 + 4 + 4 + name_size + desc_size != size) {
+       printf("something's wrong with the build-id section, size not correct");
+       return;
+   }
+
+   char* name = (char*)malloc(name_size);
+   char* desc = (char*)malloc(desc_size);
+   memcpy(name, data + 12, name_size);
+   memcpy(desc, data + 12 + name_size, desc_size);
+
+   for (int i = 0; i < desc_size; i++) {
+       // found from readelf source code.
+       sprintf(&buildID[i * 2], "%02x", desc[i] & 0xff);
+   }
+}
+
+int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName, bool tryDebug)
 {
     FILE *pyfile = fopen(elfFile, "r");
     if (pyfile == nullptr) {
+        perror(elfFile);
         return 1;
     }
     if (fseek(pyfile, 0, SEEK_END)) {
         fclose(pyfile);
+        perror("file seems to be corrupted");
         return 1;
     }
     long pyfile_size = ftell(pyfile);
@@ -30,11 +69,10 @@ int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName
                          fileno(pyfile), 0);
     if (pybytes == nullptr) {
         fclose(pyfile);
-        perror("mmap()");
+        perror("mmap failed");
         return 1;
     }
     fclose(pyfile);
-//    printf("%p\n", pybytes);
 
     const unsigned char expected_magic[] = {ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3};
 
@@ -59,41 +97,92 @@ int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName
     size_t dynsym_off = 0;
     size_t dynsym_sz = 0;
 
+    size_t strtab_off = 0;
+    size_t symtab_off = 0;
+    size_t symtab_sz = 0;
+
+    char build_id[256];
+    memset(&build_id, '\0', sizeof(build_id));
+
+    Elf64_Shdr *shdr = (Elf64_Shdr*)(pybytes + elf_hdr.e_shoff);
+    Elf64_Shdr *sh_strtab = &shdr[elf_hdr.e_shstrndx];
+    const char *const sh_strtab_p = (char*)pybytes + sh_strtab->sh_offset;
+
     for (uint16_t i = 0; i < elf_hdr.e_shnum; i++) {
+        char* hdr_name = NULL;
         size_t offset = elf_hdr.e_shoff + i * elf_hdr.e_shentsize;
+
         Elf64_Shdr shdr;
         memmove(&shdr, pybytes + offset, sizeof(shdr));
+
+        hdr_name = (char*)(sh_strtab_p + shdr.sh_name);
+
         switch (shdr.sh_type) {
-        case SHT_SYMTAB:
-        case SHT_STRTAB:
-            // TODO: have to handle multiple string tables better
-            if (!dynstr_off) {
+        case SHT_STRTAB: // .strtab .dynstr .shstrtab
+            if (strcmp(".strtab", hdr_name) == 0) {
+                strtab_off = shdr.sh_offset;
+            } else if (strcmp(".dynstr", hdr_name) == 0) {
                 dynstr_off = shdr.sh_offset;
             }
+            break;
+        case SHT_SYMTAB:
+            printf("%s %lx %lx \n", hdr_name, shdr.sh_offset, shdr.sh_size);
+            symtab_off = shdr.sh_offset;
+            symtab_sz = shdr.sh_size;
             break;
         case SHT_DYNSYM:
             dynsym_off = shdr.sh_offset;
             dynsym_sz = shdr.sh_size;
             break;
+        case SHT_NOTE:
+            if (strcmp(".note.gnu.build-id", hdr_name) == 0) {
+                getElfBuildID((const char*)pybytes, shdr.sh_offset, shdr.sh_size, build_id);
+            }
         default:
             break;
         }
     }
 
-    assert(dynstr_off);
-    assert(dynsym_off);
+    if (dynstr_off > 0 && dynsym_off > 0) {
+        for (size_t j = 0; j * sizeof(Elf64_Sym) < dynsym_sz; j++) {
+            Elf64_Sym sym;
+            size_t absoffset = dynsym_off + j * sizeof(Elf64_Sym);
+            memmove(&sym, cbytes + absoffset, sizeof(sym));
 
-    for (size_t j = 0; j * sizeof(Elf64_Sym) < dynsym_sz; j++) {
-        Elf64_Sym sym;
-        size_t absoffset = dynsym_off + j * sizeof(Elf64_Sym);
-        memmove(&sym, cbytes + absoffset, sizeof(sym));
-
-        if (sym.st_name != 0 && sym.st_value <= offset
-                && offset <= sym.st_value + sym.st_size)
-        {
-            sprintf(symName, "%s", cbytes + dynstr_off + sym.st_name);
-            return 0;
+            if (sym.st_name != 0 && sym.st_value <= offset
+                    && offset <= sym.st_value + sym.st_size)
+            {
+                sprintf(symName, "%s", cbytes + dynstr_off + sym.st_name);
+                return 0;
+            }
         }
+    }
+
+    if (strtab_off > 0 && symtab_off > 0) {
+        for (size_t j = 0; j * sizeof(Elf64_Sym) < symtab_sz; j++) {
+            Elf64_Sym sym;
+            size_t absoffset = symtab_off + j * sizeof(Elf64_Sym);
+            memmove(&sym, cbytes + absoffset, sizeof(sym));
+
+            if (sym.st_name != 0 && sym.st_value <= offset
+                    && offset <= sym.st_value + sym.st_size)
+            {
+                sprintf(symName, "%s", cbytes + strtab_off + sym.st_name);
+                return 0;
+            }
+        }
+    }
+
+    if (tryDebug) {
+        char prefix[3];
+        char suffix[256 - 2];
+        char elfDebugFile[256];
+
+        memcpy(prefix, build_id, 2);
+        memcpy(suffix, &build_id[2], 256 - 2);
+        sprintf(elfDebugFile, "/usr/lib/debug/.build-id/%s/%s.debug", prefix, suffix);
+
+        return findSymNameElf(elfDebugFile, offset, symName, false);
     }
 
     return -1;

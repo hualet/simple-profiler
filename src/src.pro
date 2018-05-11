@@ -9,7 +9,7 @@ QT       -= core gui
 TARGET = simple-profiler
 TEMPLATE = lib
 CONFIG += link_pkgconfig
-PKGCONFIG += libunwind
+PKGCONFIG += libunwind libdwarf++
 
 DEFINES += SIMPLEPROFILER_LIBRARY
 
@@ -35,7 +35,8 @@ HEADERS += \
         simple-profiler_global.h \ 
     collector.h \
     procutil.h \
-    elfutil.h
+    elfutil.h \
+    constants.h
 
 unix {
     target.path = /usr/lib

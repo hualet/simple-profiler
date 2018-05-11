@@ -6,6 +6,7 @@
 
 #include "procutil.h"
 #include "elfutil.h"
+#include "constants.h"
 
 int getSymName(uintptr_t pc, char* symName)
 {
@@ -105,7 +106,7 @@ void Collector::dumpOne() const
         }
 
         auto printPC = [&execCount](uintptr_t pc) {
-            char symName[256];
+            char symName[kMaxSymNameLength];
             uint16_t execTime = execCount[pc];
             int ret = getSymName(pc, symName);
             if (ret == 0) {

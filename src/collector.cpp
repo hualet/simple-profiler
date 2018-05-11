@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <memory.h>
 #include <map>
+#include <vector>
+#include <algorithm>
 #include <cxxabi.h>
 
 #include "procutil.h"
@@ -13,25 +15,24 @@ int getSymName(uintptr_t pc, char* symName)
 {
     int offset;
     int status;
-    size_t buffer_size;
     char elfname[kMaxElfNameLength];
-    char tempSymName[kMaxSymNameLength];
 
     int ret = ProcUtil::findTargetElf(pc, elfname, &offset);
     if (ret != 0) {
         return ret;
     }
 
-    ret = ElfUtil::findSymNameElf(elfname, offset, tempSymName);
+    ret = ElfUtil::findSymNameElf(elfname, offset, symName);
     if (ret != 0) {
         return ret;
     }
 
-    // third argument of __cxa_demangle is required to be not NULL :(
-    __cxxabiv1::__cxa_demangle(tempSymName, symName, &buffer_size, &status);
-    if (status != 0) {
-        memcpy(symName, tempSymName, kMaxSymNameLength);
+    char *demangled = abi::__cxa_demangle(symName, NULL, NULL, &status);
+    if (status == 0) {
+        strcpy(symName, demangled);
     }
+
+    free(demangled);
 
     return 0;
 }
@@ -96,7 +97,7 @@ void Collector::dumpOne() const
     for (int i = 0; i < m_threadCount; i++) {
         const ThreadBucket *buk = &m_threads[i];
 
-        std::map<uintptr_t, uint16_t, std::greater<uint16_t>> execCount;
+        std::map<uintptr_t, uint16_t> execCount;
 
         int lastStackDepth = 0;
         uintptr_t *lastStack = NULL;
@@ -120,7 +121,7 @@ void Collector::dumpOne() const
             uint16_t execTime = execCount[pc];
             int ret = getSymName(pc, symName);
             if (ret == 0) {
-                printf("(0x%lx) %s x %d\n", pc, symName, execTime);
+                printf("(0x%lx) %.30s x %d\n", pc, symName, execTime);
             } else {
                 printf("(0x%lx) anonymouse x %d \n", pc, execTime);
             }
@@ -134,12 +135,20 @@ void Collector::dumpOne() const
         }
         printf("\n");
 
+        std::vector<std::pair<uintptr_t, uint16_t>> pairs;
+        for (std::map<uintptr_t, uint16_t>::iterator iter = execCount.begin();
+             iter != execCount.end(); ++iter)
+        {
+            pairs.push_back(*iter);
+        }
+        std::sort(pairs.begin(), pairs.end(),
+                  [=](std::pair<uintptr_t, uint16_t>& a,
+                  std::pair<uintptr_t, uint16_t>& b) { return a.second > b.second; });
 
         printf("Max executed function(top  10): \n");
         int c = 0;
-        for (std::map<uintptr_t, uint16_t>::iterator iter = execCount.begin();
-             iter != execCount.end() && c < 10;
-             ++iter, c++) {
+        for (std::vector<std::pair<uintptr_t, uint16_t>>::iterator iter = pairs.begin();
+             iter != pairs.end() && c < 10; ++iter, c++) {
             printPC(iter->first);
         }
 

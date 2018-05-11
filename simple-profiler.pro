@@ -1,2 +1,3 @@
 TEMPLATE = subdirs
-SUBDIRS += src tracee
+SUBDIRS += src tracee \
+    tests

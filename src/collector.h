@@ -35,9 +35,6 @@ private:
 
     Collector();
 
-    uint8_t compareShared(const uintptr_t* lastStack, int lastStackDepth,
-                          const uintptr_t* stack, int stackDepth) const;
-
     void dumpOne() const;
 
     int findThreadIndex(const pid_t& threadID) const;

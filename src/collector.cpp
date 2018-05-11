@@ -77,21 +77,6 @@ void Collector::collectSample(pid_t threadID, uint8_t depth, uintptr_t* stacktra
     thread->sampleCount++;
 }
 
-uint8_t Collector::compareShared(const uintptr_t *lastStack, int lastStackDepth, const uintptr_t *stack, int stackDepth) const
-{
-    if (lastStackDepth == 0 || stackDepth == 0) {
-        return 0;
-    }
-
-    int i = 1;
-    for (; i < lastStackDepth && i < stackDepth; i++) {
-        if (lastStack[lastStackDepth - i] != stack[stackDepth - i])
-            break;
-    }
-
-    return i - 1;
-}
-
 void Collector::dumpOne() const
 {
     for (int i = 0; i < m_threadCount; i++) {
@@ -103,7 +88,7 @@ void Collector::dumpOne() const
         uintptr_t *lastStack = NULL;
         for (int j = 0; j < buk->sampleCount; j++) {
             Sample *samp = const_cast<Sample*>(&buk->samples[j]);
-            uint8_t shared = compareShared(lastStack, lastStackDepth, samp->stacktrace, samp->depth);
+            uint8_t shared = ElfUtil::compareShared(lastStack, lastStackDepth, samp->stacktrace, samp->depth);
 
             if (shared <= samp->depth) {
                 for (int z = shared; z < samp->depth; z++) {

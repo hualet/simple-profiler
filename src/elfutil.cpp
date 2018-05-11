@@ -20,6 +20,21 @@
 
 using namespace std;
 
+uint8_t ElfUtil::compareShared(const uintptr_t *lastStack, int lastStackDepth, const uintptr_t *stack, int stackDepth)
+{
+    if (lastStackDepth == 0 || stackDepth == 0) {
+        return 0;
+    }
+
+    int i = 1;
+    for (; i <= lastStackDepth && i <= stackDepth; i++) {
+        if (lastStack[lastStackDepth - i] != stack[stackDepth - i])
+            break;
+    }
+
+    return i - 1;
+}
+
 void getElfBuildID(const char* file, Elf64_Off offset, Elf64_Xword size, char* buildID)
 {
     const char* data = file + offset;

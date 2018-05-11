@@ -11,32 +11,6 @@
 #include "elfutil.h"
 #include "constants.h"
 
-int getSymName(uintptr_t pc, char* symName)
-{
-    int offset;
-    int status;
-    char elfname[kMaxElfNameLength];
-
-    int ret = ProcUtil::findTargetElf(pc, elfname, &offset);
-    if (ret != 0) {
-        return ret;
-    }
-
-    ret = ElfUtil::findSymNameElf(elfname, offset, symName);
-    if (ret != 0) {
-        return ret;
-    }
-
-    char *demangled = abi::__cxa_demangle(symName, NULL, NULL, &status);
-    if (status == 0) {
-        strcpy(symName, demangled);
-    }
-
-    free(demangled);
-
-    return 0;
-}
-
 static Collector* _instance = nullptr;
 
 Collector::~Collector()
@@ -77,39 +51,54 @@ void Collector::collectSample(pid_t threadID, uint8_t depth, uintptr_t* stacktra
     thread->sampleCount++;
 }
 
-void Collector::dumpOne() const
+void Collector::dumpOne()
 {
     for (int i = 0; i < m_threadCount; i++) {
         const ThreadBucket *buk = &m_threads[i];
 
-        std::map<uintptr_t, uint16_t> execCount;
+        std::map<std::string, uint16_t> execCount;
 
-        int lastStackDepth = 0;
-        uintptr_t *lastStack = NULL;
+        std::vector<std::string> oldStack;
         for (int j = 0; j < buk->sampleCount; j++) {
             Sample *samp = const_cast<Sample*>(&buk->samples[j]);
-            uint8_t shared = ElfUtil::compareShared(lastStack, lastStackDepth, samp->stacktrace, samp->depth);
 
-            if (shared <= samp->depth) {
-                for (int z = shared; z < samp->depth; z++) {
-                    uintptr_t pc = samp->stacktrace[samp->depth - z - 1];
-                    execCount[pc] = ++execCount[pc];
+            std::vector<std::string> symbolizedStack;
+            for (int z = 0; z < samp->depth; z++) {
+                char symname[kMaxSymNameLength];
+                uintptr_t pc = samp->stacktrace[z];
+
+                int ret = findSymName(pc, symname);
+                if (ret == 0) {
+                    symbolizedStack.push_back(std::string(symname));
+                } else {
+                    symbolizedStack.push_back(std::to_string(pc));
                 }
             }
 
-            lastStackDepth = samp->depth;
-            lastStack = samp->stacktrace;
+            std::vector<std::string> gained = ElfUtil::gained(oldStack, symbolizedStack);
+            for (std::vector<std::string>::iterator iter = gained.begin();
+                 iter != gained.end(); iter++)
+            {
+                execCount[*iter] = ++execCount[*iter];
+            }
+
+            oldStack = symbolizedStack;
         }
 
-        auto printPC = [&execCount](uintptr_t pc) {
+        auto printPC = [&execCount, this](uintptr_t pc) {
             char symName[kMaxSymNameLength];
-            uint16_t execTime = execCount[pc];
-            int ret = getSymName(pc, symName);
+            int ret = findSymName(pc, symName);
+            uint16_t execTime = execCount[std::string(symName)];
             if (ret == 0) {
                 printf("(0x%lx) %.30s x %d\n", pc, symName, execTime);
             } else {
                 printf("(0x%lx) anonymouse x %d \n", pc, execTime);
             }
+        };
+
+        auto printSym = [&execCount](std::string sym) {
+            uint16_t execTime = execCount[sym];
+            printf("%.40s x %d\n",sym.c_str(), execTime);
         };
 
         printf("========================== Thread: %d =======================\n", buk->tid);
@@ -120,25 +109,70 @@ void Collector::dumpOne() const
         }
         printf("\n");
 
-        std::vector<std::pair<uintptr_t, uint16_t>> pairs;
-        for (std::map<uintptr_t, uint16_t>::iterator iter = execCount.begin();
+        std::vector<std::pair<std::string, uint16_t>> pairs;
+        for (std::map<std::string, uint16_t>::iterator iter = execCount.begin();
              iter != execCount.end(); ++iter)
         {
             pairs.push_back(*iter);
         }
         std::sort(pairs.begin(), pairs.end(),
-                  [=](std::pair<uintptr_t, uint16_t>& a,
-                  std::pair<uintptr_t, uint16_t>& b) { return a.second > b.second; });
+                  [=](std::pair<std::string, uint16_t>& a,
+                  std::pair<std::string, uint16_t>& b) { return a.second > b.second; });
 
         printf("Max executed function(top  10): \n");
         int c = 0;
-        for (std::vector<std::pair<uintptr_t, uint16_t>>::iterator iter = pairs.begin();
+        for (std::vector<std::pair<std::string, uint16_t>>::iterator iter = pairs.begin();
              iter != pairs.end() && c < 10; ++iter, c++) {
-            printPC(iter->first);
+            printSym(iter->first);
         }
 
         printf("\n");
     }
+}
+
+int Collector::findSymName(uintptr_t pc, char *symName)
+{
+    int offset;
+    int status;
+    uintptr_t start;
+    size_t size;
+    char elfname[kMaxElfNameLength];
+
+    int ret = ProcUtil::findTargetElf(pc, elfname, &offset);
+    if (ret != 0) {
+        return ret;
+    }
+
+    for (std::map<std::pair<std::string, std::pair<uintptr_t, size_t>>, std::string>::iterator iter = m_symCache.begin();
+         iter != m_symCache.end(); iter++)
+    {
+        std::string elf = iter->first.first;
+        uintptr_t offset = iter->first.second.first;
+        size_t size = iter->first.second.second;
+
+        if (offset <= pc && pc <= offset + size && strcmp(elfname, elf.c_str()) == 0) {
+            strcpy(symName, iter->second.c_str());
+            return 0;
+        }
+    }
+
+    ret = ElfUtil::findSymNameElf(elfname, offset, symName, &start, &size);
+    if (ret != 0) {
+        return ret;
+    }
+
+    char *demangled = abi::__cxa_demangle(symName, NULL, NULL, &status);
+    if (status == 0) {
+        strcpy(symName, demangled);
+    }
+
+    free(demangled);
+
+    std::pair<uintptr_t, size_t> range(start, size);
+    std::pair<std::string, std::pair<uintptr_t, size_t>> key(elfname, range);
+    m_symCache[key] = symName;
+
+    return 0;
 }
 
 int Collector::findThreadIndex(const pid_t &threadID) const

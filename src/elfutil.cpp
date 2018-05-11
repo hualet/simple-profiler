@@ -20,21 +20,6 @@
 
 using namespace std;
 
-uint8_t ElfUtil::compareShared(const uintptr_t *lastStack, int lastStackDepth, const uintptr_t *stack, int stackDepth)
-{
-    if (lastStackDepth == 0 || stackDepth == 0) {
-        return 0;
-    }
-
-    int i = 1;
-    for (; i <= lastStackDepth && i <= stackDepth; i++) {
-        if (lastStack[lastStackDepth - i] != stack[stackDepth - i])
-            break;
-    }
-
-    return i - 1;
-}
-
 void getElfBuildID(const char* file, Elf64_Off offset, Elf64_Xword size, char* buildID)
 {
     const char* data = file + offset;
@@ -66,11 +51,10 @@ void getElfBuildID(const char* file, Elf64_Off offset, Elf64_Xword size, char* b
    }
 }
 
-int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName, bool tryDebug)
+int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName, uintptr_t *start, size_t *size, bool tryDebug)
 {
     FILE *pyfile = fopen(elfFile, "r");
     if (pyfile == nullptr) {
-        perror(elfFile);
         return 1;
     }
     if (fseek(pyfile, 0, SEEK_END)) {
@@ -157,6 +141,7 @@ int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName
         }
     }
 
+    // TODO(hualet): merge with bellow sample piece of code.
     if (dynstr_off > 0 && dynsym_off > 0) {
         for (size_t j = 0; j * sizeof(Elf64_Sym) < dynsym_sz; j++) {
             Elf64_Sym sym;
@@ -167,6 +152,8 @@ int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName
                     && offset <= sym.st_value + sym.st_size)
             {
                 sprintf(symName, "%s", cbytes + dynstr_off + sym.st_name);
+                *start = sym.st_value;
+                *size = sym.st_size;
                 return 0;
             }
         }
@@ -182,6 +169,8 @@ int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName
                     && offset <= sym.st_value + sym.st_size)
             {
                 sprintf(symName, "%s", cbytes + strtab_off + sym.st_name);
+                *start = sym.st_value;
+                *size = sym.st_size;
                 return 0;
             }
         }
@@ -196,8 +185,41 @@ int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName
         memcpy(suffix, &build_id[2], 256 - 2);
         sprintf(elfDebugFile, "/usr/lib/debug/.build-id/%s/%s.debug", prefix, suffix);
 
-        return findSymNameElf(elfDebugFile, offset, symName, false);
+        return findSymNameElf(elfDebugFile, offset, symName, start, size, false);
     }
 
     return -1;
+}
+
+uint8_t ElfUtil::compareShared(std::vector<string> old_stack, std::vector<string> new_stack)
+{
+    if (old_stack.size() == 0 || new_stack.size() == 0) {
+        return 0;
+    }
+
+    int i = 1;
+    for (; i <= old_stack.size() && i <= new_stack.size(); i++) {
+        if (old_stack.at(old_stack.size() - i) != new_stack.at(new_stack.size() - i))
+            break;
+    }
+
+    return i - 1;
+}
+
+std::vector<std::string> ElfUtil::gained(std::vector<string> old_stack, std::vector<string> new_stack)
+{
+    std::vector<std::string> ret;
+
+    uint8_t shared = compareShared(old_stack, new_stack);
+
+    if (shared <= new_stack.size()) {
+        uint z = 0;
+        do {
+            std::string symname = new_stack.at(z);
+            ret.push_back(symname);
+            z++;
+        } while(z < new_stack.size() - shared);
+    }
+
+    return ret;
 }

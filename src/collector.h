@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <stdint.h>
+#include <map>
 
 class Collector
 {
@@ -33,10 +34,12 @@ private:
     int m_threadCount;
     ThreadBucket m_threads[kThreadNum];
 
+    std::map<std::pair<std::string, std::pair<uintptr_t, size_t>>, std::string> m_symCache;
+
     Collector();
 
-    void dumpOne() const;
-
+    void dumpOne();
+    int findSymName(uintptr_t pc, char* symName);
     int findThreadIndex(const pid_t& threadID) const;
 };
 

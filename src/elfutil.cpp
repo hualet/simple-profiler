@@ -126,7 +126,6 @@ int ElfUtil::findSymNameElf(const char *elfFile, uintptr_t offset, char *symName
             }
             break;
         case SHT_SYMTAB:
-            printf("%s %lx %lx \n", hdr_name, shdr.sh_offset, shdr.sh_size);
             symtab_off = shdr.sh_offset;
             symtab_sz = shdr.sh_size;
             break;

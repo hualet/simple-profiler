@@ -11,7 +11,7 @@ Widget::Widget(QWidget *parent)
     connect(timer, &QTimer::timeout,
             this, &Widget::consumeCPU);
 
-    timer->start(500);
+    timer->start(100);
 }
 
 Widget::~Widget()

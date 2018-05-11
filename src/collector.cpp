@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <memory.h>
 #include <map>
+#include <cxxabi.h>
 
 #include "procutil.h"
 #include "elfutil.h"
@@ -11,16 +12,25 @@
 int getSymName(uintptr_t pc, char* symName)
 {
     int offset;
-    char elfname[256];
+    int status;
+    size_t buffer_size;
+    char elfname[kMaxElfNameLength];
+    char tempSymName[kMaxSymNameLength];
 
     int ret = ProcUtil::findTargetElf(pc, elfname, &offset);
     if (ret != 0) {
         return ret;
     }
 
-    ret = ElfUtil::findSymNameElf(elfname, offset, symName);
+    ret = ElfUtil::findSymNameElf(elfname, offset, tempSymName);
     if (ret != 0) {
         return ret;
+    }
+
+    // third argument of __cxa_demangle is required to be not NULL :(
+    __cxxabiv1::__cxa_demangle(tempSymName, symName, &buffer_size, &status);
+    if (status != 0) {
+        memcpy(symName, tempSymName, kMaxSymNameLength);
     }
 
     return 0;

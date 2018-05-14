@@ -11,8 +11,8 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = tracee
 TEMPLATE = app
 
-#QMAKE_RPATHDIR += $$OUT_PWD/../src
-#LIBS += -L$$OUT_PWD/../src/ -lsimple-profiler
+QMAKE_RPATHDIR += $$OUT_PWD/../src
+LIBS += -L$$OUT_PWD/../src/ -lsimple-profiler
 
 
 # The following define makes your compiler emit warnings if you use

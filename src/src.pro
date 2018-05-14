@@ -8,6 +8,8 @@ QT       -= core gui
 
 TARGET = simple-profiler
 TEMPLATE = lib
+CONFIG += link_pkgconfig
+PKGCONFIG += libunwind
 
 DEFINES += SIMPLEPROFILER_LIBRARY
 
